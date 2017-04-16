@@ -194,32 +194,28 @@ if $postgresql_configuration; then
   fi
   
   if "$CREATE_DATABASE" ; then
-      # get the version of psql
-      psqlVersion=$(psql -V | egrep -o '[0-9]{1,}\.[0-9]{1,}')
       # change config of psql
       cd "$INSTALLER_FOLDER"
-      python replaceConfigPSQL.py "$psqlVersion"
-      service postgresql restart
   
       # create user and database
-      postgres_template_file=./template_postgresqlConfig.sql
-      postgres_final_file=./postgresqlConfig.sql
+      POSTGRES_TEMPLATE_FILE=./template_postgresqlConfig.sql
+      POSTGRES_FINAL_FILE=./postgresqlConfig.sql
       # copy the template
-      cp "$postgres_template_file" "$postgres_final_file"
+      cp "$POSTGRES_TEMPLATE_FILE" "$POSTGRES_FINAL_FILE"
       
       # change parameters
-      sed -i -e 's/<DATABASE>/'"$DATABASE_NAME"'/g' "$postgres_final_file"
-      sed -i -e 's/<USER>/'"$POSTGRES_USER"'/g' "$postgres_final_file"
-      sed -i -e 's/<PASSWORD>/'"$POSTGRES_PASS"'/g' "$postgres_final_file"
+      sed -i -e 's/<DATABASE>/'"$DATABASE_NAME"'/g' "$POSTGRES_FINAL_FILE"
+      sed -i -e 's/<USER>/'"$POSTGRES_USER"'/g' "$POSTGRES_FINAL_FILE"
+      sed -i -e 's/<PASSWORD>/'"$POSTGRES_PASS"'/g' "$POSTGRES_FINAL_FILE"
   
       # postgres user has to be owner of the file and folder that contain the file
-      current_owner=$(stat -c '%U' .)
+      CURRENT_OWNER=$(stat -c '%U' .)
       # change owner to let postgres user exec file
       chown postgres:postgres "$INSTALLER_FOLDER"/postgresqlConfig.sql
       chown postgres:postgres "$INSTALLER_FOLDER"
-      sudo -u postgres psql -f "$postgres_final_file"
-      rm "$postgres_final_file"
-      chown "$current_owner":"$current_owner" "$INSTALLER_FOLDER"
+      sudo -u postgres psql -f "$POSTGRES_FINAL_FILE"
+      rm "$POSTGRES_FINAL_FILE"
+      chown "$CURRENT_OWNER":"$CURRENT_OWNER" "$INSTALLER_FOLDER"
   fi
 
   echo ----
@@ -250,7 +246,7 @@ if $project_configuration; then
   # set secret_key variable
   SECRET_KEY_FILE="$KEYS_PATH"/secret_key.py
   # change parameter
-  echo "SECRET_KEY=\""$DJANGO_SECRET_KEY"\"" > "$SECRET_KEY_FILE"
+  echo "SECRET_KEY=\"""$DJANGO_SECRET_KEY""\"" > "$SECRET_KEY_FILE"
 
   DATABASE_CONFIG_TEMPLATE=./template_database.py
   DATABASE_CONFIG_FILE="$KEYS_PATH"/database.py
