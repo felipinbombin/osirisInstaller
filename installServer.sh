@@ -28,7 +28,7 @@ if [ -z "$6" ]; then
     exit 1
 fi
 
-IP_SERVER=$1
+SERVER_IP=$1
 DATABASE_NAME=$2
 POSTGRES_USER=$3
 POSTGRES_PASS=$4
@@ -70,6 +70,9 @@ fi
 PROJECT_PATH=/home/"$LINUX_USER_NAME"
 PROJECT_DIR="$PROJECT_PATH"/"$REPOSITORY_NAME"
 
+# virtual environment
+VIRTUAL_ENV_NAME="myenv"
+VIRTUAL_ENV_DIR="$PROJECT_DIR"/"$VIRTUAL_ENV_NAME"
 
 #####################################################################
 # CONFIGURATION
@@ -78,7 +81,7 @@ PROJECT_DIR="$PROJECT_PATH"/"$REPOSITORY_NAME"
 clone_project=false
 install_packages=false
 postgresql_configuration=false
-project_configuration=false
+project_configuration=true
 apache_configuration=false
 
 
@@ -130,16 +133,32 @@ fi
 if $install_packages; then
 
     apt-get update
-    aptget upgrade
+    apt-get upgrade
 
     # install dependencies
 
-    cd "$PROJECT_DIR"
+    # install postgres
+    apt-get --yes install postgresql postgresql-contrib 
+    # install apache
+    apt-get install --yes apache2 libapache2-mod-wsgi
+    # install python and pip
+    apt-get --yes install python-pip python-dev libpq-dev
+    # upgrade pip
+    pip install -U pip
+    # install npm
+    apt-get --yes install nodejs
+    apt-get --yes install npm
+    ln -s /usr/bin/nodejs /usr/bin/node
+    # install bower
+    npm install -g bower
+    bower install --allow-root
+
     pip install virtualenv
+    cd "$PROJECT_DIR"
     # create virtual env
-    virtualenv myenv
+    sudo -u "$LINUX_USER_NAME" virtualenv "$VIRTUAL_ENV_NAME"
     # activate virtualenv
-    source myenv/bin/activate
+    source "$VIRTUAL_ENV_DIR"/bin/activate
 
     # install requirements
     pip install -r requirements.txt
@@ -159,7 +178,7 @@ if $postgresql_configuration; then
   echo ----
 
   CREATE_DATABASE=true
-  DATABASE_EXISTS=$(sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -w "$DATABASE_NAME")
+  DATABASE_EXISTS=$(sudo -Hiu postgres psql -lqt | cut -d \| -f 1 | grep -w "$DATABASE_NAME")
   if [ "$DATABASE_EXISTS" ]; then
       echo ""
       echo "The database $DATABASE_NAME already exists."
@@ -169,7 +188,7 @@ if $postgresql_configuration; then
       if [[ $REPLY =~ ^[Yy]$ ]]
       then
         echo "Removing database $DATABASE_NAME..."
-        sudo -u postgres psql -c "DROP DATABASE $DATABASE_NAME;"
+        sudo -Hiu postgres psql -c "DROP DATABASE $DATABASE_NAME;"
         CREATE_DATABASE=true
       fi
   fi
@@ -183,24 +202,24 @@ if $postgresql_configuration; then
       service postgresql restart
   
       # create user and database
-      postgres_template_file="$INSTALLER_FOLDER"/template_postgresqlConfig.sql
-      postgres_final_file="$INSTALLER_FOLDER"/postgresqlConfig.sql
+      postgres_template_file=./template_postgresqlConfig.sql
+      postgres_final_file=./postgresqlConfig.sql
       # copy the template
       cp "$postgres_template_file" "$postgres_final_file"
+      
       # change parameters
       sed -i -e 's/<DATABASE>/'"$DATABASE_NAME"'/g' "$postgres_final_file"
       sed -i -e 's/<USER>/'"$POSTGRES_USER"'/g' "$postgres_final_file"
       sed -i -e 's/<PASSWORD>/'"$POSTGRES_PASS"'/g' "$postgres_final_file"
   
       # postgres user has to be owner of the file and folder that contain the file
-      #current_owner=$(stat -c '%U' .)
+      current_owner=$(stat -c '%U' .)
       # change owner to let postgres user exec file
-      chown postgres "$INSTALLER_FOLDER"/postgresqlConfig.sql
-      chown postgres "$INSTALLER_FOLDER"
+      chown postgres:postgres "$INSTALLER_FOLDER"/postgresqlConfig.sql
+      chown postgres:postgres "$INSTALLER_FOLDER"
       sudo -u postgres psql -f "$postgres_final_file"
       rm "$postgres_final_file"
-      #sudo chown "${current_owner}" "$postgres_final_file"
-      #sudo chown "${current_owner}" "$INSTALLER_FOLDER"
+      chown "$current_owner":"$current_owner" "$INSTALLER_FOLDER"
   fi
 
   echo ----
@@ -223,40 +242,37 @@ if $project_configuration; then
  
   # configure wsgi
   cd "$INSTALLER_FOLDER"
-  python wsgiConfig.py "$PROJECT_PATH" "$REPOSITORY_NAME"
+  python wsgiConfig.py "$PROJECT_DIR" "$REPOSITORY_NAME"
 
-  # create secret_key.txt file
-  mkdir -p "$PROJECT_DIR"/"$REPOSITORY_NAME"/keys
-  SECRET_KEY_FILE="$PROJECT_DIR"/"$REPOSITORY_NAME"/keys/secret_key.txt
-  touch "$SECRET_KEY_FILE"
-  echo "$DJANGO_SECRET_KEY" > "$SECRET_KEY_FILE"
- 
-  database_template_file="$INSTALLER_FOLDER"/template_database.py
-  database_final_file="$PROJECT_PATH"/visualization/visualization/keys/database.py
+  SETTING_PATH="$PROJECT_DIR"/"$REPOSITORY_NAME"
+  KEYS_PATH="$SETTING_PATH"/keys
 
-  # copy the template
+  # set secret_key variable
+  SECRET_KEY_FILE="$KEYS_PATH"/secret_key.py
+  # change parameter
+  echo "SECRET_KEY=\""$DJANGO_SECRET_KEY"\"" > "$SECRET_KEY_FILE"
 
-  cp "$database_template_file" "$database_final_file"
-  sed -i -e 's/<DATABASE>/'"$DATABASE_NAME"'/g' "$database_final_file"
-  sed -i -e 's/<USER>/'"$POSTGRES_USER"'/g' "$database_final_file"
-  sed -i -e 's/<PASSWORD>/'"$POSTGRES_PASS"'/g' "$database_final_file"
+  DATABASE_CONFIG_TEMPLATE=./template_database.py
+  DATABASE_CONFIG_FILE="$KEYS_PATH"/database.py
+  cp "$DATABASE_CONFIG_TEMPLATE" "$DATABASE_CONFIG_FILE"
+  # change parameter
+  sed -i -e 's/<DATABASE>/'"$DATABASE_NAME"'/g' "$DATABASE_CONFIG_FILE"
+  sed -i -e 's/<USER>/'"$POSTGRES_USER"'/g' "$DATABASE_CONFIG_FILE"
+  sed -i -e 's/<PASSWORD>/'"$POSTGRES_PASS"'/g' "$DATABASE_CONFIG_FILE"
 
   # create folder used by loggers if not exist
   LOG_DIR="$PROJECT_DIR"/"$REPOSITORY_NAME"/logs
-  mkdir -p "$LOG_DIR"
+  sudo -u "$LINUX_USER_NAME" mkdir -p "$LOG_DIR"
   touch "$LOG_DIR"/file.log
   chmod 777 "$LOG_DIR"/file.log
 
+  # add ip to allowed_hosts list
+  sed -i -e 's/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = [u'"'$SERVER_IP'"']/g' "$SETTING_PATH"/settings.py
 
-  # install all dependencies of python to the project
-  echo "--------------------------------------------------------------------------------"
-  
-  # uptade the model of the database
+  # update database models and static files
+  source "$VIRTUAL_ENV_DIR"/bin/activate
   python "$PROJECT_DIR"/manage.py migrate
   python "$PROJECT_DIR"/manage.py collectstatic
-
-  # add the cron task data
-  #python manage.py crontab add
 
   echo ----
   echo ----
@@ -279,57 +295,13 @@ if $apache_configuration; then
   # configure apache 2.4
 
   cd "$INSTALLER_FOLDER"
-  configApache="transapp_visualization.conf"
+  configApache="osiris_web_platform.conf"
 
-  python configApache.py "$PROJECT_PATH" "$IP_SERVER" "$configApache" visualization
+  python configApache.py "$PROJECT_PATH" "$REPOSITORY_NAME" "$VIRTUAL_ENV_NAME" "$configApache"
   a2dissite 000-default.conf
   a2ensite "$configApache"
 
-  # create the certificfate
-  # this part must be by hand
-
-  sudo service apache2 reload
-
-  # change the MPM of apache.
-  # MPM is the way apache handles the request
-  # using proceses, threads or a bit of both.
-
-  # this is the default 
-  # is though to work whith php
-  # becuase php isn't thread safe.
-  # django works better whith
-  # MPM worker, but set up
-  # the number of precess and
-  # threads whith care.
-
-  sudo a2dismod mpm_event 
-  sudo a2enmod mpm_worker 
-
-  # configuration for the worker
-  # mpm.
-  # apacheSetup arg1 arg2 arg3 ... arg7
-  # arg1 StartServers: initial number of server processes to start
-  # arg2 MinSpareThreads: minimum number of 
-  #      worker threads which are kept spare
-  # arg3 MaxSpareThreads: maximum number of
-  #      worker threads which are kept spare
-  # arg4 ThreadLimit: ThreadsPerChild can be 
-  #      changed to this maximum value during a
-  #      graceful restart. ThreadLimit can only 
-  #      be changed by stopping and starting Apache.
-  # arg5 ThreadsPerChild: constant number of worker 
-  #      threads in each server process
-  # arg6 MaxRequestWorkers: maximum number of threads
-  # arg7 MaxConnectionsPerChild: maximum number of 
-  #      requests a server process serves
-  cd "$INSTALLER_FOLDER"
-  sudo python apacheSetup.py 1 10 50 30 25 75
-
   sudo service apache2 restart
-
-  # this lets apache add new things to the media folder
-  # to store the pictures of the free report
-  sudo adduser www-data "$LINUX_USER_NAME"
 
   echo ----
   echo ----
@@ -341,5 +313,5 @@ fi
 cd "$INSTALLER_FOLDER"
 
 echo "Installation ready."
-echo "To check that its all ok, enter to 0.0.0.0"
+echo "To check that its all ok, enter to $SERVER_IP/admin"
 

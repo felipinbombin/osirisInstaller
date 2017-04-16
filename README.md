@@ -23,6 +23,10 @@ This has been tested on Ubuntu 16.04 machines.
 The installation script requires sudo access.
 
 
+## Installer folder
+
+`installServer.sh` script will use some commands with postgres user, so put installer folder under `/root` path is not a good idea. We recommend to use `/tmp` path.
+
 ---
 
 # DEPLOYMENT
@@ -30,16 +34,15 @@ The installation script requires sudo access.
 
 ## Clone installer project
 
-In `/home/<user_name>` directory type:
+Move to `/tmp` directory
+```bash
+$ cd /tmp
+```
+Then type:
 ```bash
 # clone directly on the target machine
 $ git clone https://github.com/felipinbombin/osirisInstaller
 ```
-
-
-## Modify it with the missing Django key
-
-The django app needs a secret key, you can [generate a new one](http://www.miniwebtool.com/django-secret-key-generator/) and manually replace the `<INSERT_DJANGO_SECRET_KEY>` script variable on `installServer.sh`. But, if you are lazy just run the next instruction: `sed -i 's/<INSERT_DJANGO_SECRET_KEY>/<MY_DJANGO_SECRET_KEY>/g' <path_to_project>/osirisInstaller/installServer.sh`
 
 
 ## Understanding the installer
@@ -50,16 +53,16 @@ You need the following information:
 - `<POSGRES_USER>`: Name of the new postgres user
 - `<POSTGRES_USER_PASS>`: Postgres user's password
 - `<LINUX_USER_NAME>`: Linux user name used to choose the folder where web app project will be located (default: `/home/<LINUX_USER_NAME>`)
-- `<DJANGO_SECRET_KEY>`: The django app needs a secret key, you can generate a new one [here](http://www.miniwebtool.com/django-secret-key-generator/)
+- `<DJANGO_SECRET_KEY>`: The django app needs a secret key, you can generate a new one [here](http://www.miniwebtool.com/django-secret-key-generator/). It's very common that secret key contains some special character, so you need to put the code between double quote (`'`).
 
 
-It is highly recommended to read the script before running it and ALSO EXECUTTE IT BY ONE PIECE AT A TIME!. Modify the configuration section on `installServer.sh` to select which steps do you want to run. The recommended way is to deactivate all steps and run them separately. 
+It is highly recommended to read the script before running it and ALSO EXECUTTE IT BY ONE PIECE AT A TIME!. Modify the configuration section on `installServer.sh` to select which steps you want to run. The recommended way is to deactivate all steps and run them separately. 
 
 Inside `installServert.sh` you will discover 5 steps:
 1. Clone project: clone django server project
 2. Install packages: set virtualenv and install project dependencies
 3. Postgresql configuration: create database and database user
-4. Project configuration: Connect database with project
+4. Project configuration: Connect database with django project
 5. Apache configuration: set wsgi
 
 ## Known Problems
@@ -77,7 +80,7 @@ Go to the installation folder and execute the next command line.
 
 ```bash
 # run with sudo
-$ sudo bash installServer.sh <SERVER_PUBLIC_IP> <DATABASE_NAME> <POSTGRES_USER> <POSTGRES_USER_PASS> <DJANGO_SECRET_KEY>
+$ sudo bash installServer.sh <SERVER_PUBLIC_IP> <DATABASE_NAME> <POSTGRES_USER> <POSTGRES_USER_PASS> "<DJANGO_SECRET_KEY>"
 ```
 
 When the script ends, you will need to append this machine IP address to `ALLOWED_HOSTS` django variable on the `settings.py` server file.
@@ -95,7 +98,7 @@ To log in on web application you have to create a super user in django framework
 ```bash
 $ python manage.py createsuperuser
 ```
-With this new user you can create others through django admin web page (`<ip>/admin`).
+With this new user you can create others through django admin web page (`<SERVER_IP>/admin`).
 
 
 # The ends

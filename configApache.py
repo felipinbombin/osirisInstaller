@@ -1,9 +1,9 @@
+import sys
+import os
 
-def getConfigFileHTTP(pathToProyect, projectName):
+def getConfigFileHTTP(projectPath, projectName, virtualEnvName):
+    projectDir = "{}/{}".format(projectPath, projectName)
     return '''
-    # path to virtual env
-    WSGIPythonHome '''  + pathToProyect + '''/''' + projectName + '''/myenv
-
     <VirtualHost *:80>
         # The ServerName directive sets the request scheme, hostname and port that
         # the server uses to identify itself. This is used when creating
@@ -17,12 +17,12 @@ def getConfigFileHTTP(pathToProyect, projectName):
         #ServerAdmin webmaster@localhost
         #DocumentRoot /var/www/html
 
-        Alias /static ''' + pathToProyect + '''/''' + projectName + '''/static
-        <Directory ''' + pathToProyect + '''/''' + projectName + '''/static>
+        Alias /static ''' + projectDir + '''/static
+        <Directory ''' + projectDir + '''/static>
                 Require all granted
         </Directory>
 
-        <Directory ''' + pathToProyect + '''/''' + projectName + '''/''' + projectName + '''>
+        <Directory ''' + projectDir + '''/''' + projectName + '''>
                 <Files wsgi.py>
                       Require all granted
                 </Files>
@@ -30,9 +30,9 @@ def getConfigFileHTTP(pathToProyect, projectName):
 
         LoadModule wsgi_module /usr/lib/apache2/modules/mod_wsgi.so
 
-        WSGIDaemonProcess ''' + projectName + ''' python-path=''' + pathToProyect + '''/''' + projectName + ''':''' + pathToProyect + '''/''' + projectName + '''/venv/lib/python2.7/$
+        WSGIDaemonProcess ''' + projectName + ''' python-path=''' + projectDir + ''' python-home=''' + projectDir + '''/''' + virtualEnvName + '''
         WSGIProcessGroup ''' + projectName + '''
-        WSGIScriptAlias / ''' + pathToProyect + '''/''' + projectName + '''/''' + projectName + '''/wsgi.py
+        WSGIScriptAlias / ''' + projectDir + '''/''' + projectName + '''/wsgi.py
 
         # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
         # error, crit, alert, emerg.
@@ -51,19 +51,25 @@ def getConfigFileHTTP(pathToProyect, projectName):
         #Include conf-available/serve-cgi-bin.conf
     </VirtualHost>'''
 
-import sys
-import os
+def processApacheConfigFile(projectPath, projectName, virtualEnvName, apacheFileName):
 
-if len(sys.argv) < 4:
-    pass
-else:
-    configFile = getConfigFileHTTP(sys.argv[1], sys.argv[4])
+    configFile = getConfigFileHTTP(projectPath, projectName, virtualEnvName)
 
     #Writte the file to destination
     PATH = '/etc/apache2/sites-available/'
-    pathFile = "{}{}".format(PATH, sys.argv[3])
+    pathFile = "{}{}".format(PATH, apacheFileName)
 
     FILE = open(pathFile, 'w')
     for line in configFile:
         FILE.write(line)
     FILE.close()
+
+if __name__ == "__main__":
+    if len(sys.argv) < 4:
+        pass
+    else:
+        projectPath = sys.argv[1]
+        projectName = sys.argv[2]
+        virtualEnvName = sys.argv[3]
+        apacheFileName = sys.argv[4]
+        processApacheConfigFile(projectPath, projectName, virtualEnvName, apacheFileName)
