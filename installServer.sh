@@ -74,6 +74,7 @@ PROJECT_DIR="$PROJECT_PATH"/"$REPOSITORY_NAME"
 VIRTUAL_ENV_NAME="myenv"
 VIRTUAL_ENV_DIR="$PROJECT_DIR"/"$VIRTUAL_ENV_NAME"
 
+
 #####################################################################
 # CONFIGURATION
 #####################################################################
@@ -81,7 +82,7 @@ VIRTUAL_ENV_DIR="$PROJECT_DIR"/"$VIRTUAL_ENV_NAME"
 clone_project=false
 install_packages=false
 postgresql_configuration=false
-project_configuration=true
+project_configuration=false
 apache_configuration=false
 
 
@@ -140,7 +141,7 @@ if $install_packages; then
     # install postgres
     apt-get --yes install postgresql postgresql-contrib 
     # install apache
-    apt-get install --yes apache2 libapache2-mod-wsgi
+    apt-get install --yes apache2 libapache2-mod-wsgi-py3
     # install python and pip
     apt-get --yes install python-pip python-dev libpq-dev
     # upgrade pip
@@ -269,7 +270,15 @@ if $project_configuration; then
   source "$VIRTUAL_ENV_DIR"/bin/activate
   python "$PROJECT_DIR"/manage.py migrate
   python "$PROJECT_DIR"/manage.py collectstatic
+  python "$PROJECT_DIR"/manage.py loaddata models possibleQueue
 
+  # create super user
+  echo "creating super user to manage web system ..."
+  python "$PROJECT_DIR"/manage.py createsuperuser
+
+  # run tests
+  coverage run --source='.' manage.py test
+  
   echo ----
   echo ----
   echo "Project configuration ready"
