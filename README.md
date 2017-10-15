@@ -1,11 +1,12 @@
 # Overview
 
-This repository mantains the code for deploying OsirisWebPlatform server on a linux machine, which means:
+This repository mantains the code for deploying OsirisWebPlatform server on a linux machine (ubuntu 16.04), which means:
 - Step 1: linux user creation
 - Step 2: dependencies installation
 - Step 3: postgresql configuration
-- Step 4: clone and setup of the django app
-- Step 5: apache configuration
+- Step 4: creation of ssh keys
+- Step 5: clone and setup of the django app
+- Step 6: apache configuration
 
 
 --- 
@@ -47,7 +48,7 @@ $ git clone https://github.com/felipinbombin/osirisInstaller
 
 ## Understanding the installer
 
-You need the following information:
+You need following information:
 - `<SERVER_PUBLIC_IP>`: This server public IP, used in apache configuration file
 - `<DATABASE_NAME>`: Name of the new database
 - `<POSGRES_USER>`: Name of the new postgres user
@@ -64,6 +65,22 @@ Inside `installServert.sh` you will discover 5 steps:
 3. Postgresql configuration: create database and database user
 4. Project configuration: Connect database with django project
 5. Apache configuration: set wsgi
+
+## Create ssh keys
+
+you need two ssh keys to establish bidirectional channel between web platform and CMM cluster infrastructure. For this follow next steps:
+
+- On osiris web server:
+  - Create a ssh key with command ```ssh-keygen``` (it is saved on ```~/.ssh/``` folder)
+  - Put private key (usually with name ```id_rsa```) on file ```<SERVER_PATH>/osirisWebPlatform/keys/ssh_key```
+  - Copy public key (usually with name ```id_ras.pub```) on ```~/.ssh/authorized_keys``` of CMM cluster
+- On CMM cluster (similar to prevoius step):
+  - Create a ssh key with command ```ssh-keygen``` (it is saved on ```~/.ssh/``` folder)
+  - Copy public key (usually with name ```id_ras.pub```) on ```~/.ssh/authorized_keys``` of osiris web server
+
+It is important to know that the name ssh key is not important so you can change it (for readbility for example).
+
+**You can check the connection status running tests**
 
 ## Known Problems
 
@@ -100,6 +117,15 @@ $ python manage.py createsuperuser
 ```
 With this new user you can create others through django admin web page (`<SERVER_IP>/admin`).
 
+## Activate crontab configuration
+
+crontab executes a periodical method that check if connection between osiris web server and cmm cluster had a problem and finish tasks that finished on cmm cluster without communicate this end to osiris web server. to activate you have to execute:
+
+```
+python manage.py crontab add
+```
+
+Crontab has other options as ```show``` and ```remove```. More information [here](https://pypi.python.org/pypi/django-crontab).
 
 # The ends
 
